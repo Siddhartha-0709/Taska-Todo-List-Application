@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: todo_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: todoapp
+    volumes:
+      - /mnt/mongodb-data:/data/db
+    ports:
+      - "27018:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - todo_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: todo_backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/todoapp
+      JWT_SECRET: ${JWT_SECRET:-change_this_secret_before_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - "5000:5000"
+    networks:
+      - todo_net
+
+networks:
+  todo_net:
+    driver: bridge
